@@ -1,15 +1,17 @@
 {
-  "name": "generator",
+  "name": "immutable-quadtrees",
   "version": "1.0.0",
-  "description": "",
+  "description": "Immutable quadtrees in JavaScript",
+  "keywords": ["immutable", "quadtree", "quadtrees", "game", "map", "functional"],
   "main": "lib/index.js",
   "scripts": {
     "test": "mocha --compilers js:babel-register",
     "build": "babel src -d lib/",
     "lint": "eslint src/",
-    "start": "node lib/index.js"
+    "start": "node lib/index.js",
+    "prepublish": "npm run build"
   },
-  "author": "",
+  "author": "Zubry <zubryjs@gmail.com>",
   "license": "ISC",
   "devDependencies": {
     "babel-cli": "^6.7.7",
@@ -28,5 +30,13 @@
   "dependencies": {
     "check-types": "^6.0.0",
     "immutable": "^3.8.1"
+  },
+  "bugs": {
+    "url": "https://github.com/Zubry/immutable-quadtree/issues",
+    "email": "zubryjs@gmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Zubry/immutable-quadtree"
   }
 }

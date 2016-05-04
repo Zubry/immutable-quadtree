@@ -9,6 +9,6 @@ function boundary(x, y, width = 0, height = 0) {
 
   return map({ width, height })
     .merge(position(x, y));
-};
+}
 
 export default boundary;

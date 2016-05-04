@@ -25,6 +25,6 @@ function node(boundary, maxChildren = 4, maxDepth = 4, depth = 0) {
   const overlappingChildren = list();
 
   return map({ boundary, maxChildren, maxDepth, depth, quadrants, children, overlappingChildren });
-};
+}
 
 export default node;
