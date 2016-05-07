@@ -4,7 +4,7 @@ import boundary from './../structs/boundary.js';
 import node from './../structs/node.js';
 
 const Node = (function Node() {
-  const addChild = function addChild(n, item) {
+  function addChild(n, item) {
     assert(
       check.all(['x', 'y', 'width', 'height'].map((key) => item.has(key))),
       'Missing boundary'
@@ -17,9 +17,9 @@ const Node = (function Node() {
 
     return n
       .update('children', (l) => l.push(item));
-  };
+  }
 
-  const addOverlappingChild = function addOverlappingChild(n, item) {
+  function addOverlappingChild(n, item) {
     assert(
       check.all(['x', 'y', 'width', 'height'].map((key) => item.has(key))),
       'Missing boundary'
@@ -32,9 +32,9 @@ const Node = (function Node() {
 
     return n
       .update('overlappingChildren', (l) => l.push(item));
-  };
+  }
 
-  const split = function split(n) {
+  function split(n) {
     assert(
       check.all(['x', 'y', 'width', 'height'].map((key) => n.get('boundary').has(key))),
       'Missing boundary'
@@ -81,9 +81,9 @@ const Node = (function Node() {
             halfwidth
           ), n.get('maxChildren'), n.get('maxDepth'), depth))
       ));
-  };
+  }
 
-  const isLeaf = function isLeaf(n) {
+  function isLeaf(n) {
     // n is a leaf when its quadrants haven't been set
     assert(
       n.has('quadrants'),
@@ -91,9 +91,9 @@ const Node = (function Node() {
     );
 
     return check.null(n.get('quadrants').get('top-left'));
-  };
+  }
 
-  const clear = function clear(n) {
+  function clear(n) {
     let removedNodes = n;
 
     // If the node has quadrants,
@@ -108,9 +108,9 @@ const Node = (function Node() {
     return removedNodes
       .update('children', (l) => l.clear())
       .update('overlappingChildren', (l) => l.clear());
-  };
+  }
 
-  const isSplittable = function isSplittable(n) {
+  function isSplittable(n) {
     // A node is splittable when:
     //   it has more than the maximum number of children and
     //   it is below the max depth
@@ -122,7 +122,7 @@ const Node = (function Node() {
     const len = n.get('children').count();
 
     return len > n.get('maxChildren') && n.get('depth') < n.get('maxDepth');
-  };
+  }
 
   return {
     addChild,

@@ -6,11 +6,15 @@ Quadtrees are, as the name suggests, tree-shaped data structures in which each n
 
 There are other implementations for quadtrees in JavaScript, such as those by [Mike Chambers](http://www.mikechambers.com/blog/2011/03/21/javascript-quadtree-implementation/) and [Silflow](https://github.com/silflow/quadtree-javascript), but there is still ground to be broken. In particular, I aim to create an *immutable* quadtree implementation.
 
+In this project, I'm trying out a style that emulates Elixir-style modules, where state and data are kept completely separated from the functions that transform them. This style makes it a lot easier to compose objects, since data can be composed with Immutable's `Map.merge`. Modules can be composed in the same way, but I just use native objects in this project since I don't have to compose any modules.
+
+I start this project at the lowest level. We'll define the structs that we need (which, again, only store state and data), then we'll define the modules that operate on them. Then, we'll put it all together into a `Quadtree` module. If it helps, you can read this writeup from the bottom up.
+
 ## API
 
-Fundamentally, quadtrees have only two operations: `insert(node, item)` and `search(node, boundary)`. To make our tree a little easier to use, however, we'll add `create()` and `clear(node)` methods.
+Fundamentally, quadtrees have only two operations: `insert(node, item)` and `search(node, boundary)`. To make our tree a little easier to use, however, we'll add `create()` and `clear(node)` methods. Because we're lazy, we'll also add a `batchInsert(node, [items])` method, that inserts a list of items into the quadtree.
 
-We'll also need to create three data structures, `Position`, `Boundary`, and `Node`:
+Before we get started on the quadtree, we'll also need to create three data structures, `Position`, `Boundary`, and `Node`:
 
 ### Position
 
@@ -26,7 +30,7 @@ We'll also need to create three data structures, `Position`, `Boundary`, and `No
 
 ### Node
 
- * `Record[Node] quadrants`
+ * `map quadrants`
  * `list[Boundary] children`
  * `list[Boundary] overlappingChildren // Children that fit into multiple subquadrants`
  * `int maxChildren`
@@ -91,13 +95,18 @@ Nodes are more complicated than boundaries. First and foremost, we accept 4 para
 
 The boundary parameter should be required. MaxChildren and MaxDepth should have reasonable defaults (I chose 4 for both), and depth should default to 0. The latter 3 should be integers, and boundary should have x, y, width, and height properties.
 
-We also need to set some "internal" properties. From those coming from an OO background, these would likely be private. We define a quadrants record, which has 'top-left', 'top-right', 'bottom-left', 'bottom-right' properties. We also define a list of children and a list of overlapping children, which represents children that would fit in multiple nodes.
+We also need to set some "internal" properties. We define a quadrants map, which has 'top-left', 'top-right', 'bottom-left', 'bottom-right' properties. We also define a list of children and a list of overlapping children, which represents children that would fit in multiple nodes.
+
+For those coming from an OO background, this struct just contains the properties that you would have in a Node class.
 
 ```javascript
 import { Map as map, List as list } from 'immutable';
 import check, { assert } from 'check-types';
 
 function node(boundary, maxChildren = 4, maxDepth = 4, depth = 0) {
+  // This just ensures that our boundary has x, y, width, and height properties.
+  // It's important to check this now, so that we don't get any errors later on in the process,
+  // where it'll be harder to determine how they happened
   assert(
     check.all(['x', 'y', 'width', 'height'].map((key) => boundary.has(key))),
     'Missing boundary'
@@ -110,6 +119,13 @@ function node(boundary, maxChildren = 4, maxDepth = 4, depth = 0) {
   assert.integer(depth);
   assert.greaterOrEqual(depth, 0);
 
+  // In a quadtree, nodes contain 4 subnodes
+  // Because we use quadtrees for "spatial partitioning", we call each subnode a quadrant
+  // Non-leaves, i.e. nodes that have subnodes, will have 4 quadrants, where each quadrant points
+  // to another node.
+  // Leaves should only point to null. All nodes should start as leaves
+  // When we insert items into this node, eventually we'll have too many to search efficiently.
+  // At that point, we split the node into 4 quadrants and distribute its items (children) among them.
   const quadrants = map({
     'top-left': null,
     'top-right': null,
@@ -130,12 +146,14 @@ export default node;
 
 Now that our data structures are all set, we can work on the functions that manipulate them.
 
-First, let's create the boundary module. We need two methods: `within(bound, item)`, which checks if bound `fully` contains `item`, and `intersects(bound1, bound2)`, which checks if `bound1` and `bound2` intersect each other.
+First, let's create the boundary module. We need two methods: `within(bound, item)`, which checks if bound *fully* contains `item`, and `intersects(bound1, bound2)`, which checks if `bound1` and `bound2` *intersect* each other.
 
 ```javascript
 import check from 'check-types';
 
 const Boundary = (function Boundary() {
+  // Checks if an item (2nd parameter) is fully within a quadrant (first parameter).
+  // We use this to determine whether an item overlaps a quadrant boundary, which is a special case
   function within(bound, item) {
     check.assert(
       check.all(['x', 'y', 'width', 'height'].map((key) => bound.has(key)))
@@ -152,6 +170,8 @@ const Boundary = (function Boundary() {
     );
   }
 
+  // Checks if the two items intersect each other
+  // This is used for basic collision detection, so that we can return a list of items that have collided with the given item
   function intersects(bound1, bound2) {
     check.assert(
       check.all(['x', 'y', 'width', 'height'].map((key) => bound1.has(key)))
@@ -188,7 +208,7 @@ import boundary from './../structs/boundary.js';
 import node from './../structs/node.js';
 
 const Node = (function Node() {
-  const addChild = function addChild(n, item) {
+  function addChild(n, item) {
     assert(
       check.all(['x', 'y', 'width', 'height'].map((key) => item.has(key))),
       'Missing boundary'
@@ -201,9 +221,9 @@ const Node = (function Node() {
 
     return n
       .update('children', (l) => l.push(item));
-  };
+  }
 
-  const addOverlappingChild = function addOverlappingChild(n, item) {
+  function addOverlappingChild(n, item) {
     assert(
       check.all(['x', 'y', 'width', 'height'].map((key) => item.has(key))),
       'Missing boundary'
@@ -216,9 +236,10 @@ const Node = (function Node() {
 
     return n
       .update('overlappingChildren', (l) => l.push(item));
-  };
+  }
 
-  const split = function split(n) {
+  // Splits a node into 4 subnodes/quadrants
+  function split(n) {
     assert(
       check.all(['x', 'y', 'width', 'height'].map((key) => n.get('boundary').has(key))),
       'Missing boundary'
@@ -229,14 +250,18 @@ const Node = (function Node() {
       'Missing node properties'
     );
 
+    // Get the current boundary of the node
+    // It's easier to call toObject() on it and destructure it
     const { x, y, width, height } = n.get('boundary').toObject();
 
+    // Calculate the midpoints along the horizontal (hmid) and vertical (vmid) axes.
     const halfwidth = width / 2;
     const halfheight = height / 2;
     const hmid = x + halfwidth;
     const vmid = y + halfheight;
     const depth = n.get('depth') + 1;
 
+    // Update our quadrants property to contain new subquadrants in the top left, top right, bottom left, and bottom right positions.
     return n
       .update('quadrants', (q) => (
         q
@@ -265,9 +290,9 @@ const Node = (function Node() {
             halfwidth
           ), n.get('maxChildren'), n.get('maxDepth'), depth))
       ));
-  };
+  }
 
-  const isLeaf = function isLeaf(n) {
+  function isLeaf(n) {
     // n is a leaf when its quadrants haven't been set
     assert(
       n.has('quadrants'),
@@ -275,9 +300,9 @@ const Node = (function Node() {
     );
 
     return check.null(n.get('quadrants').get('top-left'));
-  };
+  }
 
-  const clear = function clear(n) {
+  function clear(n) {
     let removedNodes = n;
 
     // If the node has quadrants,
@@ -292,9 +317,9 @@ const Node = (function Node() {
     return removedNodes
       .update('children', (l) => l.clear())
       .update('overlappingChildren', (l) => l.clear());
-  };
+  }
 
-  const isSplittable = function isSplittable(n) {
+  function isSplittable(n) {
     // A node is splittable when:
     //   it has more than the maximum number of children and
     //   it is below the max depth
@@ -306,7 +331,7 @@ const Node = (function Node() {
     const len = n.get('children').count();
 
     return len > n.get('maxChildren') && n.get('depth') < n.get('maxDepth');
-  };
+  }
 
   return {
     addChild,
@@ -342,6 +367,7 @@ const Quadtree = (function Quadtree() {
     return node(boundary, maxChildren, maxDepth, 0);
   }
 
+  // Calculate which quadrant the item belongs in
   function determineQuadrant(n, item) {
     const b = n.get('boundary');
 
@@ -383,6 +409,9 @@ const Quadtree = (function Quadtree() {
       'Missing node properties'
     );
 
+    // If the node has subnodes, determine which quadrant the item belongs in
+    // If it doesn't fit all the way into that quadrant, it is an overlapping child
+    // If it does, insert the item into that quadrants recursively.
     if (!Node.isLeaf(n)) {
       const direction = determineQuadrant(n, item);
       const quadrant = n.get('quadrants').get(direction);
@@ -394,7 +423,11 @@ const Quadtree = (function Quadtree() {
       return Node.addOverlappingChild(n, item);
     }
 
+    // If the node is a leaf, just add the item to the list of children
     const updatedNode = Node.addChild(n, item);
+
+    // If the node is now splittable, split it
+    // Otherwise, return the updated node
 
     if (!Node.isSplittable(updatedNode)) {
       return updatedNode;
@@ -402,6 +435,8 @@ const Quadtree = (function Quadtree() {
 
     const splitNode = Node.split(updatedNode);
 
+    // After we split the node, we have to remove its children and reinsert them
+    // This causes the quadree to put each child in the quadrant that fits it best.
     const children = splitNode.get('children');
 
     return children
@@ -427,19 +462,23 @@ const Quadtree = (function Quadtree() {
       'Missing node properties'
     );
 
+    // If the item doesn't intersect our current boundary, we don't have to do anything
     if (!Boundary.intersects(n.get('boundary'), item)) {
       return list();
     }
 
+    // Get a list of children and overlapping children that intersect with our search term (item)
     const points = n
       .get('children')
       .concat(n.get('overlappingChildren'))
       .filter((x) => Boundary.intersects(item, x));
 
+    // If the node is a leaf, we're done. Return the list.
     if (Node.isLeaf(n)) {
       return points;
     }
 
+    // Otherwise, recursively search each quadrant and add it to our list of results.
     const quadrants = n.get('quadrants');
 
     return points
