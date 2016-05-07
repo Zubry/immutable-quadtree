@@ -2,13 +2,13 @@
 
 ## Introduction
 
-Quadtrees are, as the name suggests, tree-shaped data structures in which each node has 4 child nodes. For the purpose of collision detection, we let each of the 4 nodes represent a quadrant of a coordinate plane. We then let each node contain a list of items within its quadrant. When the list of items grows too long, the node is split into 4 quadrants, and its items are redistributed among them. This allows for us to recursively search the tree for items within a boundary. Performance-wise, this process is vastly superior to alternative implementations, such as search a 2D array.
+Quadtrees are, as the name suggests, tree-shaped data structures in which each node has 4 child nodes. For the purpose of collision detection, we let each of the 4 nodes represent a quadrant of a coordinate plane. We then let each node contain a list of items within its quadrant. When the list of items grows too long, the node is split into 4 quadrants, and its items are redistributed among them. This allows for us to recursively search the tree for items within a boundary. Performance-wise, this process is vastly superior to alternative implementations, such as searching a 2D array.
 
 There are other implementations for quadtrees in JavaScript, such as those by [Mike Chambers](http://www.mikechambers.com/blog/2011/03/21/javascript-quadtree-implementation/) and [Silflow](https://github.com/silflow/quadtree-javascript), but there is still ground to be broken. In particular, I aim to create an *immutable* quadtree implementation.
 
 In this project, I'm trying out a style that emulates Elixir-style modules, where state and data are kept completely separated from the functions that transform them. This style makes it a lot easier to compose objects, since data can be composed with Immutable's `Map.merge`. Modules can be composed in the same way, but I just use native objects in this project since I don't have to compose any modules.
 
-I start this project at the lowest level. We'll define the structs that we need (which, again, only store state and data), then we'll define the modules that operate on them. Then, we'll put it all together into a `Quadtree` module. If it helps, you can read this writeup from the bottom up.
+I start this project at the lowest level. We'll define the structs that we need (which, again, only store state and data), then we'll define the modules that operate on them. Finally, we'll put it all together into a `Quadtree` module. If it helps, you can read this writeup from the bottom up.
 
 ## API
 
